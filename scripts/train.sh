@@ -1,0 +1,1 @@
+python -W ignore tools/train.py --config_file='configs/veri.yml'
