@@ -41,7 +41,6 @@ def inference(
     logger.info("inference takes {:.3f}s".format((end - start)))
     torch.cuda.empty_cache()
     cmc, mAP, indices_np = metric.compute()
-    logger.info(f'cmc: {cmc}')
     logger.info('Validation Results')
     logger.info("mAP: {:.1%}".format(mAP))
     for r in [1, 5, 10]:
