@@ -42,10 +42,8 @@ def extract_features(model, cfg, val_loader):
             outputs = outputs.data.cpu()
 
             for fname, output, pid in zip(img_paths, outputs, pids):
-                # print(fname)
                 features[fname] = output
                 labels[fname] = pid
-        # print(f'len:{len(features)}')
     return features, labels
 
 
@@ -56,13 +54,11 @@ def plot_tsne(features, labels, save_path):
     label:(N) 有N个标签
     '''
     tsne = TSNE(n_components=2, init='pca', random_state=0)
-    # plt.rcParams.update({'font.size': 18})
 
-    class_num = len(np.unique(labels))  # 要分类的种类个数  eg:[0, 1, 2, 3]这个就是为4
+    class_num = len(np.unique(labels))
     latent = features
-    tsne_features = tsne.fit_transform(features)  # 将特征使用PCA降维至2维
-    print('tsne_features的shape:', tsne_features.shape)
-    plt.scatter(tsne_features[:, 0], tsne_features[:, 1])  # 将对降维的特征进行可视化
+    tsne_features = tsne.fit_transform(features)
+    plt.scatter(tsne_features[:, 0], tsne_features[:, 1])
 
     df = pd.DataFrame()
     df["y"] = labels
@@ -72,14 +68,13 @@ def plot_tsne(features, labels, save_path):
     sns.scatterplot(x=df[" "], y=df["  "], hue=df.y.tolist(),
                     palette=sns.color_palette("hls", class_num),
                     data=df).set(title=" ")
-    plt.legend(loc='upper right', bbox_to_anchor=(1.47, 1.02))  # 将图例放置图外
+    plt.legend(loc='upper right', bbox_to_anchor=(1.47, 1.02))
     plt.xlabel('(b) Our', fontsize=18)
-    # plt.gca().set_yticklabels([])
     plt.tight_layout()
     plt.savefig(save_path)
     plt.show()
 
-# 主函数，执行t-SNE降维
+
 def main():
 
     random.seed(cfg.DATASETS.SEED)
@@ -114,18 +109,10 @@ def main():
 
     if args.config_file != "":
         logger.info("Loaded configuration file {}".format(args.config_file))
-        # with open(args.config_file, 'r') as cf:
-        #     config_str = "\n" + cf.read()
-        #     logger.info(config_str)
     logger.info("Running with config:\n{}".format(cfg))
 
     if cfg.MODEL.DEVICE == "cuda":
-        # os.environ['CUDA_VISIBLE_DEVICES'] = cfg.MODEL.DEVICE_ID    # new add by gu
         torch.cuda.set_device(1)
-   # if cfg.MODEL.DEVICE == "cuda":
-  #      os.environ['CUDA_VISIBLE_DEVICES'] = cfg.MODEL.DEVICE_ID
-   # cudnn.benchmark = True
-
 
     train_loader, val_loader, num_query, num_classes, dataset = make_data_loader(cfg)
     model = build_model(cfg, num_classes)
@@ -133,15 +120,11 @@ def main():
 
     features, labels = extract_features(model, cfg, val_loader)
     save_path = os.path.join(output_dir, 'tsne_plot.png')
-    # features = torch.cat([features[f].unsqueeze(0) for f, _, _ in sorted(dataset.query + dataset.gallery)], 0)
     labels_list = []
     features_list = []
-    # print(f'labels:{labels}, len:{len(labels)}')
-    for i, label in enumerate(labels):
-        # print(i)
-        if 160 <= labels[label] < 200:  # class_num
 
-            # labels_list.append(np.array(labels[label].data))
+    for i, label in enumerate(labels):
+        if 160 <= labels[label] < 200:
             labels_list.append(np.array(labels[label]))
             features_list.append(np.array(features[label].cpu()))
     labels_list = np.array(labels_list)
@@ -152,7 +135,5 @@ def main():
 
     plot_tsne(features_list, labels_list, save_path)
 
-
-# 主函数
 if __name__ == '__main__':
     main()

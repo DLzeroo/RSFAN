@@ -39,13 +39,8 @@ def train(cfg):
     print('Model Params: {}'.format(count_parameters(model)))
 
     optimizer = make_optimizer(cfg, model)
+    loss_func = make_loss(cfg, num_classes)
 
-    # scheduler = WarmupMultiStepLR(optimizer, cfg.SOLVER.STEPS, cfg.SOLVER.GAMMA, cfg.SOLVER.WARMUP_FACTOR,
-    #                               cfg.SOLVER.WARMUP_ITERS, cfg.SOLVER.WARMUP_METHOD)
-
-    loss_func = make_loss(cfg, num_classes)  # modified by gu
-    # loss_func_2 = copy.deepcopy(loss_func_1)
-    # loss_func_3 = copy.deepcopy(loss_func_1)
 
     # Add for using self trained model
     if cfg.MODEL.PRETRAIN_CHOICE == 'imagenet':
@@ -61,7 +56,6 @@ def train(cfg):
         last_epoch = start_epoch
         model.load_state_dict(checkpoint['state_dict'])
         model.cuda()
-        #optimizer = make_optimizer(cfg, model)
         optimizer.load_state_dict(checkpoint['optimizer'])
         print('resume from {}'.format(cfg.MODEL.PRETRAIN_PATH))
     else:
@@ -76,13 +70,11 @@ def train(cfg):
         train_loader,
         val_loader,
         optimizer,
-        scheduler,  # modify for using self trained model
+        scheduler,
         loss_func,
-        # loss_func_2,
-        # loss_func_3,
         num_query,
         num_classes,
-        start_epoch  # add for using self trained model
+        start_epoch
     )
 
 
@@ -119,13 +111,10 @@ def main():
 
     if args.config_file != "":
         logger.info("Loaded configuration file {}".format(args.config_file))
-        # with open(args.config_file, 'r') as cf:
-        #     config_str = "\n" + cf.read()
-        #     logger.info(config_str)
     logger.info("Running with config:\n{}".format(cfg))
 
     if cfg.MODEL.DEVICE == "cuda":
-        os.environ['CUDA_VISIBLE_DEVICES'] = cfg.MODEL.DEVICE_ID    # new add by gu
+        os.environ['CUDA_VISIBLE_DEVICES'] = cfg.MODEL.DEVICE_ID
         torch.cuda.set_device(1)
     train(cfg)
 
