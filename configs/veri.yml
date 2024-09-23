@@ -113,5 +113,5 @@ TEST:
   TRACK_RERANK: False # 是否进行轨迹重排。默认为False，即不进行轨迹重排
   USE_VOC: False # 是否使用VOC数据集进行重排。默认为False，即不使用VOC数据集进行重排
 #  WEIGHT: 'output/best.pth' #  模型权重文件的路径。默认为'output/best.pth'
-  WEIGHT: 'output/best model/Baseline + RL + CCA + SFA + DVLoss/best.pth'
+  WEIGHT: '/media/sda/xyz/track_double_branch/output/best model/mAP=90.pth'
   WRITE_RESULT: True # 是否将结果写入到文件中。默认为True，即将结果写入到文件中
