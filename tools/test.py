@@ -61,7 +61,7 @@ def main():
 
     if cfg.MODEL.DEVICE == "cuda":
         os.environ['CUDA_VISIBLE_DEVICES'] = cfg.MODEL.DEVICE_ID
-        torch.cuda.set_device(1)
+        torch.cuda.set_device(0)
 
 
     train_loader, val_loader, num_query, num_classes, dataset = make_data_loader(cfg)
