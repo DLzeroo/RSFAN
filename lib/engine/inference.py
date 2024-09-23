@@ -48,11 +48,9 @@ def inference(
     return indices_np
 
 def plot_tsne(feats, labels, num_classes, save_path):
-    # 使用 t-SNE 对特征向量进行降维
     tsne = TSNE(n_components=2, random_state=0)
     feats_tsne = tsne.fit_transform(feats)
 
-    # 创建一个 DataFrame 以便使用 seaborn 进行可视化
     import pandas as pd
     df = pd.DataFrame({
         'Feature 1': feats_tsne[:, 0],
@@ -60,10 +58,8 @@ def plot_tsne(feats, labels, num_classes, save_path):
         'Label': labels
     })
 
-    # 设置 seaborn 样式
     sns.set(style="whitegrid")
 
-    # 绘制 t-SNE 图
     plt.figure(figsize=(10, 8))
     sns.scatterplot(x='Feature 1', y='Feature 2', hue='Label', data=df, palette=sns.color_palette("hsv", num_classes))
     plt.title('t-SNE Visualization')

@@ -37,9 +37,6 @@ def make_data_loader(cfg, shuffle_train=True):
                 dataset.train.extend(apply_id_bias(to_merge_train, id_bias=max_id + 1))
                 dataset.train_tracks += cur_dataset.test_tracks
         dataset.train = dataset.relabel(dataset.train) # in case of inconsistent ids
-        # dataset.train.extend(dataset.train)
-        # dataset.train.extend(dataset.train)
-        # dataset.train.extend(dataset.train)
 
     # cutoff long tailed data
     if cfg.INPUT.CUTOFF_LONGTAILED:Cybercoreess(dataset.train,
@@ -86,11 +83,6 @@ def make_data_loader(cfg, shuffle_train=True):
             sampler=RandomIdentitySampler(dataset.train, cfg.SOLVER.IMS_PER_BATCH, cfg.DATALOADER.NUM_INSTANCE),
             num_workers=num_workers, collate_fn=train_collate_fn
         )
-        # train_loader = DataLoader(
-        #     train_set, batch_size=cfg.SOLVER.IMS_PER_BATCH,
-        #     shuffle=False, num_workers=num_workers,
-        #     collate_fn=train_collate_fn
-        # )
 
     val_set = ImageDataset(dataset.query + dataset.gallery, val_transforms, transform_mask=None, training=False, change_background=False)
     val_loader = DataLoader(

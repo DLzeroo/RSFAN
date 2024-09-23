@@ -14,12 +14,8 @@ if __name__ == '__main__':
         T.RandomHorizontalFlip(0.0),
         T.Pad(0),
         T.RandomCrop([256, 256]),
-        #RandomPatch(prob_happen=0.0, patch_max_area=0.5),
-        #T.RandomApply([T.transforms.RandomAffine(degrees=20, scale=(0.8, 1.3))], p=0.5),
-        #T.RandomApply([T.ColorJitter(brightness=0.2, contrast=0.15, saturation=0, hue=0)], p=0.0),
         AugMix(prob=0.5),
         RandomBlur(p=1.0),
     ])
     canvas = transform(img)
-    #img.save('test.jpg')
     cv2.imwrite('test.jpg', canvas[:, :, ::-1])

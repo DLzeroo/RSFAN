@@ -9,16 +9,11 @@ import torch
 import random
 import torch.nn as nn
 import torch.nn.functional as F
-# from .t_sne import plot_tsneo
 from torchsummary import summary
 from thop import profile, clever_format
 from torch.utils.tensorboard import SummaryWriter
 from lib.utils.reid_eval import evaluator
-# from ..layers.cross_dist import C
-from ..layers.build import CDLoss
-# from ..layers.cross_dist import Loss_DC
-# import pytorch_grad_cam
-# from pytorch_grad_cam.utils.image import show_cam_on_image
+from ..layers.build import DVLoss
 global ITER
 ITER = 0
 
@@ -26,16 +21,6 @@ ITER = 0
 ITER_LOG=0
 global WRITER
 WRITER = SummaryWriter(log_dir='output/logs')
-
-
-# try:
-#     from apex.parallel import DistributedDataParallel as DDP
-#     from apex.fp16_utils import *
-#     from apex import amp, optimizers
-#     from apex.multi_tensor_apply import multi_tensor_applier
-# except ImportError:
-#     raise ImportError("Please install apex from https://www.github.com/nvidia/apex to run this example.")
-
 
 def do_train(
         cfg,
@@ -46,8 +31,6 @@ def do_train(
         optimizer,
         scheduler,
         loss_fn,
-        # loss_fn_2,
-        # loss_fn_3,
         num_query,
         num_classes,
         start_epoch
@@ -56,23 +39,7 @@ def do_train(
     device = cfg.MODEL.DEVICE
 
     if device:
-        #model.to(device)
         model.cuda()
-        # Apex FP16 training
-        # if cfg.SOLVER.FP16:
-        #     logging.getLogger("Using Mix Precision training")
-        #     model, optimizer = amp.initialize(model, optimizer, opt_level='O1')
-    # input_shape = (3, 256, 256)
-    # target_shape = ()
-    # # summary(model, [input_shape,input_shape])
-    # input_tensor1 = torch.randn(1, *input_shape).to(device)
-    # input_tensor2 = torch.randn(1, *input_shape).to(device)
-    # input_target = torch.randn(1, *target_shape).to(device)
-    # flops, params = profile(model, inputs=(input_tensor1,input_tensor2,input_target))
-    # flops, params = clever_format([flops, params], "%.3f")
-    # print("FLOPs: %s" % (flops))
-    # print("params: %s" % (params))
-
 
     logger = logging.getLogger("reid_baseline.train")
     logger.info("Start training")
@@ -125,12 +92,11 @@ def do_train(
 
 
 def train(model, dataset, train_loader, optimizer, loss_fn, epoch, cfg, logger, num_classes):
-    # loss_fn_2 = copy.deepcopy(loss_fn)
-    # loss_fn_3 = copy.deepcopy(loss_fn)
+
     losses_1 = AverageMeter()
     losses_2 = AverageMeter()
     losses_3 = AverageMeter()
-    # losses_cd = AverageMeter()
+    losses_dv = AverageMeter()
     data_time = AverageMeter()
     model_time = AverageMeter()
 
@@ -139,50 +105,28 @@ def train(model, dataset, train_loader, optimizer, loss_fn, epoch, cfg, logger, 
     ITER = 0
     log_period = cfg.SOLVER.LOG_PERIOD
     data_start = time.time()
-    # KLloss = KLLoss(margin=cfg.SOLVER.KL_ALPHA)
-    # cd_loss = CDLoss(cfg)
+    dv_loss = DVLoss(cfg)
 
-    # import ipdb; ipdb.set_trace()
+
     for batch in train_loader:
         data_time.update(time.time() - data_start)
         input_ori, input_mask, target, _, _, _ = batch
         input_ori = input_ori.cuda()
         input_mask = input_mask.cuda()
         target = target.cuda()
-        # print(f'mask:{input_mask.size()}')
-        # print(f'target:{target.size()}')
         model_start = time.time()
         ITER += 1
         optimizer.zero_grad()
         score_ori, score_mask, score_fusion, feat_ori, feat_mask, feat_fusion = model(input_ori, input_mask, target)
-        # score_ori, score_mask, feat_ori, feat_mask = model(input_ori, input_mask, target)
         id_loss_1, metric_loss_1 = loss_fn(score_ori, feat_ori, target)
         id_loss_2, metric_loss_2 = loss_fn(score_mask, feat_mask, target)
         id_loss_3, metric_loss_3 = loss_fn(score_fusion, feat_fusion, target)
-        # loss_cd = cd_loss(score_ori, score_mask, score_fusion)
-        # loss_bc = bc_loss(feat_ori, feat_mask)
-        # print(f'loss_bc_grad:{loss_bc.requires_grad}')
-        # print(loss_bc)
-        # print(id_loss_3)
-        # print(id_loss_3.size())
+        loss_dv = dv_loss(score_ori, score_mask, score_fusion)
         loss_1 = id_loss_1 + metric_loss_1
         loss_2 = id_loss_2 + metric_loss_2
         loss_3 = id_loss_3 + metric_loss_3
-        # loss_kl = 10.0 * KLloss(score_ori, score_mask, score_fusion)
 
-        loss = loss_1 + loss_2 + loss_3
-        # loss = loss_1 + loss_2 + loss_3 + 1.0 * loss_cd
-        # print(type(loss))
-        # print(f'loss_grad:{loss.requires_grad}')
-        # if cfg.SOLVER.FP16:
-        #     with amp.scale_loss(loss, optimizer) as scaled_loss:
-        #         scaled_loss.backward()
-        # else:
-        #     loss.backward()
-        # if loss_bc.grad is not None:
-        #     print("Gradient of loss_bc exists.")
-        # else:
-        #     print("Gradient of loss_bc is None.")
+        loss = loss_1 + loss_2 + loss_3 + 1.0 * loss_dv
 
         loss.backward()
         optimizer.step()
@@ -193,19 +137,12 @@ def train(model, dataset, train_loader, optimizer, loss_fn, epoch, cfg, logger, 
         losses_1.update(to_python_float(loss_1.data), input_ori.size(0))
         losses_2.update(to_python_float(loss_2.data), input_mask.size(0))
         losses_3.update(to_python_float(loss_3.data), input_ori.size(0))
-        # losses_cd.update(to_python_float(loss_cd.data), input_ori.size(0))
+        losses_dv.update(to_python_float(loss_dv.data), input_ori.size(0))
 
         if ITER % log_period == 0:
-            # logger.info("Epoch[{}] Iteration[{}/{}] id_loss_1: {:.3f}, metric_loss_1: {:.5f}, total_loss_1: {:.3f}, id_loss_2: {:.3f}, metric_loss_2: {:.5f}, total_loss_2: {:.3f}, id_loss_3: {:.3f}, metric_loss_3: {:.5f}, total_loss_3: {:.3f}, cd_loss: {:.5f}, data time: {:.3f}s, model time: {:.3f}s"
-            #             .format(epoch, ITER, len(train_loader),
-            #                     id_loss_1.item(), metric_loss_1.item(), losses_1.val, id_loss_2.item(), metric_loss_2.item(), losses_2.val, id_loss_3.item(), metric_loss_3.item(), losses_3.val, losses_cd.val,data_time.val, model_time.val))
-
-            logger.info(
-                "Epoch[{}] Iteration[{}/{}] id_loss_1: {:.3f}, metric_loss_1: {:.5f}, total_loss_1: {:.3f}, id_loss_2: {:.3f}, metric_loss_2: {:.5f}, total_loss_2: {:.3f}, id_loss_3: {:.3f}, metric_loss_3: {:.5f}, total_loss_3: {:.3f}, data time: {:.3f}s, model time: {:.3f}s"
-                .format(epoch, ITER, len(train_loader),
-                        id_loss_1.item(), metric_loss_1.item(), losses_1.val, id_loss_2.item(), metric_loss_2.item(),
-                        losses_2.val, id_loss_3.item(), metric_loss_3.item(), losses_3.val,
-                        data_time.val, model_time.val))
+            logger.info("Epoch[{}] Iteration[{}/{}] id_loss_1: {:.3f}, metric_loss_1: {:.5f}, total_loss_1: {:.3f}, id_loss_2: {:.3f}, metric_loss_2: {:.5f}, total_loss_2: {:.3f}, id_loss_3: {:.3f}, metric_loss_3: {:.5f}, total_loss_3: {:.3f}, dv_loss: {:.5f}, data time: {:.3f}s, model time: {:.3f}s"
+                        .format(epoch, ITER, len(train_loader),
+                                id_loss_1.item(), metric_loss_1.item(), losses_1.val, id_loss_2.item(), metric_loss_2.item(), losses_2.val, id_loss_3.item(), metric_loss_3.item(), losses_3.val, losses_dv.val,data_time.val, model_time.val))
 
             global ITER_LOG
             WRITER.add_scalar(f'Loss_Train_id_loss',id_loss_1.item(), ITER_LOG)
@@ -217,7 +154,7 @@ def train(model, dataset, train_loader, optimizer, loss_fn, epoch, cfg, logger, 
             WRITER.add_scalar(f'Loss_Train_id_loss', id_loss_3.item(), ITER_LOG)
             WRITER.add_scalar(f'Loss_Train_metric_loss', metric_loss_3.item(), ITER_LOG)
             WRITER.add_scalar(f'Loss_Train_totals', losses_3.val, ITER_LOG)
-            # WRITER.add_scalar(f'Loss_Train_cd', losses_cd.val, ITER_LOG)
+            WRITER.add_scalar(f'Loss_Train_dv', losses_dv.val, ITER_LOG)
             ITER_LOG+=1
         data_start = time.time()
     end = time.time()
@@ -227,7 +164,6 @@ def train(model, dataset, train_loader, optimizer, loss_fn, epoch, cfg, logger, 
 
 def validate(model, dataset, val_loader, num_query, epoch, cfg, logger):
     metric = evaluator(num_query, dataset, cfg, max_rank=50)
-    # import ipdb; ipdb.set_trace()
     model.eval()
     with torch.no_grad():
         for batch in val_loader:
@@ -237,7 +173,6 @@ def validate(model, dataset, val_loader, num_query, epoch, cfg, logger):
             output = [feats, pid, camid, img_path]
             metric.update(output)
     cmc, mAP, _ = metric.compute()
-    logger.info(f'cmc: {cmc}')
     logger.info("Validation Results - Epoch: {}".format(epoch))
     logger.info("mAP: {:.1%}".format(mAP))
     for r in [1, 5, 10]:
@@ -265,14 +200,6 @@ class AverageMeter(object):
 
 def frozen_feature_layers(model):
     for name, module in model.named_children():
-        # if 'classifier' in name:
-        #     module.train()
-        #     for p in module.parameters():
-        #         p.requires_grad = True
-        # else:
-        #     module.eval()
-        #     for p in module.parameters():
-        #         p.requires_grad = False
         if 'base' in name:
             module.eval()
             for p in module.parameters():
