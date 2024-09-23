@@ -180,11 +180,11 @@ class Baseline(nn.Module):
         self.neck_feat = neck_feat
         self.ID_LOSS_TYPE = cfg.MODEL.ID_LOSS_TYPE
 
-        # self.conv_ori = nn.Sequential(
-        #     nn.Linear(self.in_planes, self.in_planes, bias=False),
-        #     nn.BatchNorm1d(self.in_planes),
-        #     nn.ReLU(inplace=True),
-        # )
+        self.conv_ori = nn.Sequential(
+            nn.Linear(self.in_planes, self.in_planes, bias=False),
+            nn.BatchNorm1d(self.in_planes),
+            nn.ReLU(inplace=True),
+        )
         # self.conv_mask = nn.Sequential(
         #     nn.Linear(self.in_planes, self.in_planes, bias=False),
         #     nn.BatchNorm1d(self.in_planes),
@@ -259,7 +259,7 @@ class Baseline(nn.Module):
 
         global_feat_ori = global_feat_ori.flatten(1)
         # print(f'ori:{global_feat_ori.size()}')
-        # global_feat_ori = self.conv_ori(global_feat_ori)
+        global_feat_ori = self.conv_ori(global_feat_ori)
         global_feat_mask = global_feat_mask.flatten(1)
         # print(f'ori:{global_feat_ori.size()}')
         # print(f'mask:{global_feat_mask.size()}')

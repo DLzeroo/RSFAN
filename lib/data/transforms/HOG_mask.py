@@ -92,9 +92,4 @@ class HOGMask(object):
         #     return img
         # else:
         #     return img_copy
-        return img_copyratio, value=value)
-        coordinates, h, w = self.get_params(img)
-
-        # print(img_tensor.size())
-        return erase(img_tensor, coordinates, h, w, mean=self.mean, inplace=self.inplace)
-
+        return img_copy
