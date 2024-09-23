@@ -22,14 +22,14 @@ model_urls = {
     'resnet152': 'https://download.pytorch.org/models/resnet152-b121ed2d.pth',
 }
 
-class channel_attention_fusion(nn.Module):
+class cross_channel_attention(nn.Module):
 
     def __init__(self, output_channel, f_2_channel=2048, f_4_channel=2048):
-        super(channel_attention_fusion, self).__init__()
-        # self.f_3_channel = f_3_channel # 1024
+        super(cross_channel_attention, self).__init__()
+
         self.f_2_channel = f_2_channel # 512
         self.f_4_channel = f_4_channel # 2048
-        # self.conv1_1 = nn.Conv2d(self.f_3_channel, output_channel, kernel_size=3, stride=1, padding=1)
+
         self.conv1_1 = nn.Conv2d(self.f_2_channel, output_channel, kernel_size=3, stride=2, padding=1)
         self.conv1_2 = nn.Conv2d(self.f_4_channel, output_channel, kernel_size=3, stride=1, padding=1)
         self.bn1_1 = nn.BatchNorm2d(output_channel)
@@ -55,14 +55,11 @@ class channel_attention_fusion(nn.Module):
             nn.BatchNorm2d(output_channel)
         )
         self.sigmoid = nn.Sigmoid()
-        # self.gep =
 
 
 
     def forward(self, x_1, x_2):
-        # x_ori = x_2
-        # print(f'x_1_ori:{x_1.size()}') #(64,512,32,32)
-        # print(f'x_2_ori:{x_2.size()}') #(64,2048,16,16)
+
         x_1 = self.conv1_1(x_1)
         x_1 = self.bn1_1(x_1)
         x_1 = self.relu(x_1)
@@ -70,39 +67,25 @@ class channel_attention_fusion(nn.Module):
         x_2 = self.conv1_2(x_2)
         x_2 = self.bn1_2(x_2)
         x_2 = self.relu(x_2)
-        # print(f'x_1:{x_1.size()}') # (64,2048,16,16)
-        # print(f'x_2:{x_2.size()}') # (64,2048,16,16)
 
-        x_1_AP = self.gap(x_1) # (64,2048,1,1)
-        # x_1_MP = self.gmp(x_1)
-        # x_1_EMP = self.gem(x_1)
 
+        x_1_AP = self.gap(x_1)
         x_2_AP = self.gap(x_2)
-        # print(x_2_AP.size()) # (64,2048,1,1)
-        # x_2_MP = self.gmp(x_2)
-        # x_2_EMP = self.gem(x_2)
-        # x_cat = torch.cat((x_1_AP, x_2_MP, x_2_AP, x_1_MP), dim=1)
-        x_cat = torch.cat((x_1_AP, x_2_AP), dim=1)
-        # print(x_cat.size()) # (64,4096,1,1)
 
+        x_cat = torch.cat((x_1_AP, x_2_AP), dim=1)
         x_cat = self.downsample(x_cat)
-        # print(f'after ds:{x_cat.size()}') #(64,1024,1,1)
         x_cat = self.upsample(x_cat)
-        # print(f'after us:{x_cat.size()}') #(64,2048,1,1)
         alpha = self.sigmoid(x_cat)
 
         x_fin = alpha * x_1 + (1-alpha) * x_2
         x_fin = self.conv2(x_fin)
-        # x_fin = 0.9*x_ori + 0.1* x_fin
-        # print(f'alpha:{alpha}')
-        # print(f'1-alpha:{1-alpha}')
-        # print(x_fin.size()) # (63,2048,16,16)
+
         return x_fin
 
 
-class Cross_Branch_Fusion(nn.Module):
+class spatial_feature_aggreation(nn.Module):
     def __init__(self, normalize_feature=True):
-        super(Cross_Branch_Fusion,self).__init__()
+        super(spatial_feature_aggreation,self).__init__()
         self.normalize_feature = normalize_feature
 
     def forward(self, f_ori, f_mask): # 32,2048
@@ -113,26 +96,8 @@ class Cross_Branch_Fusion(nn.Module):
             f_ori_nor = F.normalize(f_ori)
             f_mask_nor = F.normalize(f_mask)
         correlation_matrix = torch.matmul(f_mask_nor.T, f_ori_nor)
-        # correlation_matrix = torch.matmul(f_ori_nor.T, f_mask_nor)
-        # self_correlation_matrix = torch.matmul(f_ori_nor.T, f_ori_nor)
-        # weights = torch.mean(self_correlation_matrix, dim=1) - torch.mean(correlation_matrix, dim=1)
         weights = torch.mean(correlation_matrix, dim=1)
-        # weights = F.normalize(weights)
-        # print(f'weights:{weights.size()}')# 2048
         f_fusion = f_ori * weights.unsqueeze(0) + 0.3 * f_ori
-        # f_fusion = f_ori * weights.unsqueeze(0)
-        # print(f'fus:{f_fusion.size()}')
-        # cb_channel_attention_matrix = torch.matmul(f_mask.T, f_ori)
-        # channel_selfattention_matrix = torch.matmul(f_ori.T, f_ori)
-        # weights_cb,_ = torch.max(cb_channel_attention_matrix, dim=1)
-        # weights_sa,_ = torch.max(channel_selfattention_matrix, dim=1)
-
-        # f_fusion_cb = f_ori * weights_cb.unsqueeze(0)
-        # f_fusion_sa = f_ori * weights_sa.unsqueeze(0)
-
-        # f_fusion = f_fusion_sa + f_fusion_cb
-
-        # print(f'fus:{f_fusion.size()}') # (32,2048)
 
         return f_fusion
 
@@ -239,7 +204,6 @@ class Bottleneck_IBN(nn.Module):
     def forward(self, x):
         residual = x
 
-        # print(f'x:{x.size()}')
         out = self.conv1(x)
         out = self.bn1(out)
         out = self.relu(out)
@@ -277,20 +241,14 @@ class ResNet_IBN(nn.Module):
         self.layer2 = self._make_layer(block, scale*2, layers[1], stride=2)
         self.layer3 = self._make_layer(block, scale*4, layers[2], stride=2) # 256
         self.layer4 = self._make_layer(block, scale*8, layers[3], stride=last_stride) # (bottleneck, 512, 3, 1)
-        # print(f'layer1:{self.layer1}')
-        # print(f'layer2:{self.layer2}')
-        # print(f'layer3:{self.layer3}')
-        # print(f'layer4:{self.layer4}')
 
-        # self.layer1_y = copy.deepcopy(self.layer1)
-        # self.layer2_y = copy.deepcopy(self.layer2)
         self.layer3_y = copy.deepcopy(self.layer3)
         self.layer4_y = copy.deepcopy(self.layer4)
 
         self.avgpool = nn.AvgPool2d(7)
         self.fc = nn.Linear(scale * 8 * block.expansion, num_classes)
 
-        self.CAFF = channel_attention_fusion(f_2_channel=512, f_4_channel=2048, output_channel=2048)
+        self.CCA = cross_channel_attention(f_2_channel=512, f_4_channel=2048, output_channel=2048)
         for m in self.modules():
             if isinstance(m, nn.Conv2d):
                 n = m.kernel_size[0] * m.kernel_size[1] * m.out_channels
@@ -328,44 +286,28 @@ class ResNet_IBN(nn.Module):
         x = self.bn1(x)
         x = self.relu(x)
         x = self.maxpool(x)
+
         y = self.conv1(y)
         y = self.bn1(y)
         y = self.relu(y)
         y = self.maxpool(y)
 
         x = self.layer1(x)
-        x = self.layer2(x) # 40*40*512
-        # x_2 = x
+        x = self.layer2(x)
         y = self.layer1(y)
         y = self.layer2(y)
-        # y = self.layer1_y(y)
-        # y = self.layer2_y(y)
         y_2 = y
+
         x = self.layer3(x)
-        # x_3 = x
-        # print(f'x_3:{x_3.size()}') (128, 1024, 16, 16)
-        x = self.layer4(x) # 20*20*2048
-
-        # print(f'x_4:{x.size()}') (128, 2048, 16, 16)
-
+        x = self.layer4(x)
         y = self.layer3_y(y)
-        # y = self.layer3(y)
-        # y_3 = y
         y = self.layer4_y(y)
-        # y = self.layer4(y)
-        # y_4 = y
-        # x = self.CAFF(x_3, x)
-        y = self.CAFF(y_2, y)
-        # x = self.avgpool(x)
-        # x = x.view(x.size(0), -1)
-        # x = self.fc(x)
+        y = self.CCA(y_2, y)
 
-        # return y_2, y_4, y, x
         return x, y
 
     def forward(self, x,y):
-        # f_2, f_4,f_y, f_x = self.featuremap(x,y)
-        # return f_2, f_4, f_y, f_x
+
         f_ori, f_mask = self.featuremap(x,y)
         return f_ori, f_mask
 
@@ -382,11 +324,9 @@ def resnet50_ibn_a(last_stride, pretrained=False, **kwargs):
         pretrained (bool): If True, returns a model pre-trained on ImageNet
     """
     model = ResNet_IBN(last_stride, Bottleneck_IBN, [3, 4, 6, 3], **kwargs)
-    # for k, v in model.state_dict().items():
-    #     print(k)
+
     if pretrained:
         model.load_state_dict(model_zoo.load_url(model_urls['resnet50']))
-        # model.branch2.load_state_dict(model_zoo.load_url(model_urls['resnet50']))
     return model
 
 

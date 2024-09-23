@@ -32,7 +32,6 @@ def vis_actmap(model, cfg, val_loader, max_num=100):
             data, pid, camid, img_path = batch
             data = data.cuda()
             featmap_ori, featmap_mask, featmap_fusion, f_x = model(data,data, return_featmap=True) # N*2048*7*7
-            # featmap_ori, featmap_mask = model(data, data, return_featmap=True)
             '''featmap_ori'''
             featmap_ori = (featmap_ori**2).sum(1) # N*1*7*7
             canvas_ori = []

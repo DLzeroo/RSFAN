@@ -13,8 +13,7 @@ from torch import nn
 from .backbones import build_backbone
 from lib.layers.pooling import GeM
 from lib.layers.metric_learning import Arcface, Cosface, AMSoftmax, CircleLoss
-from .backbones.resnet_ibn_a import Cross_Branch_Fusion as CB
-from .backbones.resnet_ibn_a import channel_attention_fusion as CLF
+from .backbones.resnet_ibn_a import spatial_feature_aggreation as SFA
 
 def weights_init_kaiming(m):
     classname = m.__class__.__name__
@@ -27,7 +26,6 @@ def weights_init_kaiming(m):
             nn.init.constant_(m.bias, 0.0)
     elif classname.find('BatchNorm') != -1:
         if m.affine:
-            #nn.init.constant_(m.weight, 1.0)
             nn.init.normal_(m.weight, std=0.001)
             nn.init.constant_(m.bias, 0.0)
 
@@ -91,7 +89,6 @@ class Baseline_reduce(nn.Module):
 
         self.feature_dim = cfg.MODEL.EMBEDDING_DIM
 
-        #self.reduce = nn.Linear(self.in_planes, self.feature_dim)
         self.reduce = build_embedding_head(cfg.MODEL.EMBEDDING_HEAD,
                                            self.in_planes, self.feature_dim,
                                            cfg.MODEL.DROPOUT_PROB)
@@ -185,19 +182,12 @@ class Baseline(nn.Module):
             nn.BatchNorm1d(self.in_planes),
             nn.ReLU(inplace=True),
         )
-        # self.conv_mask = nn.Sequential(
-        #     nn.Linear(self.in_planes, self.in_planes, bias=False),
-        #     nn.BatchNorm1d(self.in_planes),
-        #     nn.ReLU(inplace=True),
-        # )
 
         self.bottleneck_ori = nn.BatchNorm1d(self.in_planes)
         self.bottleneck_ori.bias.requires_grad_(False)  # no shift
-        #self.bottleneck = IBN(self.in_planes)
         self.bottleneck_mask = nn.BatchNorm1d(self.in_planes)
         self.bottleneck_mask.bias.requires_grad_(False)
         self.bottleneck = nn.BatchNorm1d(self.in_planes)
-        # self.bottleneck = nn.BatchNorm1d(self.in_planes*2)
         self.bottleneck.bias.requires_grad_(False)
 
 
@@ -225,49 +215,34 @@ class Baseline(nn.Module):
                                         s=cfg.SOLVER.COSINE_SCALE, m=cfg.SOLVER.COSINE_MARGIN)
             self.classifier_mask = copy.deepcopy(self.classifier_ori)
             self.classifier = copy.deepcopy(self.classifier_ori)
-            # self.classifier = CircleLoss(self.in_planes*2, self.num_classes,
-            #                                  s=cfg.SOLVER.COSINE_SCALE, m=cfg.SOLVER.COSINE_MARGIN)
         else:
             self.classifier_ori = nn.Linear(self.in_planes, self.num_classes, bias=False)
             self.classifier_mask = nn.Linear(self.in_planes, self.num_classes, bias=False)
             self.classifier = nn.Linear(self.in_planes, self.num_classes, bias=False)
 
-        self.CBFusion = CB()
-        # self.CLF = CLF(f_3_channel=2048, f_4_channel=2048, output_channel=2048) # 添加该代码会降低性能
+        self.SFA = SFA()
         self.bottleneck_ori.apply(weights_init_kaiming)
         self.bottleneck_mask.apply(weights_init_kaiming)
         self.bottleneck.apply(weights_init_kaiming)
         self.classifier_ori.apply(weights_init_classifier)
         self.classifier_mask.apply(weights_init_classifier)
         self.classifier.apply(weights_init_classifier)
-        #self.att = SpatialAttention2d(2048, 512)
-
-    # def forward(self, x,y, label=None, return_featmap=False):
-    #     featmap_ori, featmap_mask = self.base(x,y)  # (128, 2048, 16, 16)
 
     def forward(self, x, y, label=None, return_featmap=False):
-        # featmap_ori, featmap_mask, f_CLF, f_x = self.base(x, y)
+
         featmap_ori, featmap_mask = self.base(x, y)
-        # print(f'ori:{featmap_ori.size()}')
-        # print(f'mask:{featmap_mask.size()}')
-        #featmap = self.bottleneck(featmap)
-        #featmap = self.att(featmap) * featmap
+
         if return_featmap:
             return featmap_ori, featmap_mask, f_CLF, f_x
         global_feat_ori = self.gap(featmap_ori)
         global_feat_mask = self.gap(featmap_mask)
 
         global_feat_ori = global_feat_ori.flatten(1)
-        # print(f'ori:{global_feat_ori.size()}')
+
         global_feat_ori = self.conv_ori(global_feat_ori)
         global_feat_mask = global_feat_mask.flatten(1)
-        # print(f'ori:{global_feat_ori.size()}')
-        # print(f'mask:{global_feat_mask.size()}')
-        # global_feat_mask = self.conv_mask(global_feat_mask)
-        global_feat = self.CBFusion(global_feat_ori,global_feat_mask)
-        # global_feat = torch.cat((global_feat_ori, global_feat_mask), dim=1)
+        global_feat = self.SFA(global_feat_ori,global_feat_mask)
 
-        # import ipdb; ipdb.set_trace()
         feat_ori = self.bottleneck_ori(global_feat_ori)  # normalize for angular softmax
         feat_mask = self.bottleneck_mask(global_feat_mask)
         feat = self.bottleneck(global_feat)
@@ -282,14 +257,11 @@ class Baseline(nn.Module):
                 cls_score_mask = self.classifier_mask(feat_mask)
                 cls_score = self.classifier(feat)
             return cls_score_ori, cls_score_mask,cls_score ,feat_ori, feat_mask, feat # global_feat  # global feature for triplet loss
-            # return cls_score_ori, cls_score_mask, feat_ori, feat_mask
+
         else:
             if self.neck_feat == 'after':
-                # print("Test with feature after BN")
-                # final_feat = torch.cat((feat_ori,feat), dim=1)
                 return feat
             else:
-                # print("Test with feature before BN")
                 return global_feat
 
     def load_param(self, trained_path, skip_fc=True):
@@ -318,9 +290,8 @@ class Baseline_2_Head(Baseline):
         self.gap_2 = nn.AdaptiveAvgPool2d(1)
         
     def forward(self, x, label=None, return_featmap=False):
-        featmap_low, featmap = self.base(x)  # (b, 2048, 1, 1)
-        #featmap = self.bottleneck(featmap)
-        #featmap = self.att(featmap) * featmap
+        featmap_low, featmap = self.base(x)
+
         if return_featmap:
             return featmap_low, featmap
         

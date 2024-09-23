@@ -57,7 +57,6 @@ class CenterLoss(nn.Module):
             labels: 具有形状 (batch_size) 的真实标签。
         """
         batch_size = x.size(0)
-        # 计算样本与类别中心之间的欧几里得距离平方
         distmat_x = torch.pow(x, 2).sum(dim=1, keepdim=True).expand(batch_size, self.num_classes) + \
                   torch.pow(self.centers, 2).sum(dim=1, keepdim=True).expand(self.num_classes, batch_size).t()
         distmat_x.addmm_(1, -2, x, self.centers.t())
@@ -72,10 +71,10 @@ class CenterLoss(nn.Module):
         labels = labels.unsqueeze(1).expand(batch_size, self.num_classes)
         mask = labels.eq(classes.expand(batch_size, self.num_classes))
 
-        # 将距离矩阵与标签掩码相乘，以获得与类别中心对应的距离
+
         dist_x = distmat_x * mask.float()
         dist_y = distmat_y * mask.float()
-        # 计算损失，避免梯度爆炸或消失
+
         loss = dist_x.clamp(min=1e-12, max=1e+12).sum() / batch_size + dist_y.clamp(min=1e-12, max=1e+12).sum() / batch_size
 
         return 0.01 * loss
@@ -135,25 +134,17 @@ class batch_center_loss(nn.Module):
 
     def forward(self, feates1, feates2):
         center1 = torch.mean(feates1, dim=1)
-        # print(center1.dtype)
         center2 = torch.mean(feates2, dim=1)
 
         first1 = feates1[0]
         first2 = feates2[0]
 
-
-        # print(f'dist:{1 - self.dist(center1, center2)}')
-
         if self.dist_type == 'l2' or self.dist_type == 'l1':
             dist = max(0.0, self.dist(center1, center2) - self.margin)
 
-            # print(dist.dtype)
 
         elif self.dist_type == 'cos':
-            # dist = max(0.0, 1 - self.dist(center1, center2) - self.margin)
             dist = max(0.0, 1 - self.dist(first1, first2) - self.margin)
-        # print(center1)
-        # print(f'size:{center1.size()}')
         return torch.tensor(dist)
 
 def loss_kd_js(self, old_logits, new_logits):
