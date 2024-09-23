@@ -43,13 +43,13 @@ Organize them in `your dataset root dir` folder as follows:
 ## Training
 
 ```python
-python -W ignore tools/train.py --config_file='configs/veri.yml'
+sh train.sh
 ```
 
 ## Testing
 
 ```python
-python -W ignore tools/test.py --config_file='configs/veri.yml'
+sh test.sh
 ```
 ## Results
 Download the video of test on the VeRi-776 dataset from [here](https://pan.baidu.com/s/1AubvbI96R4H5Z-azhZKAVg?pwd=v42r).
