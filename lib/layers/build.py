@@ -82,7 +82,7 @@ def make_loss(cfg, num_classes):
 
 
 class DVLoss(nn.Module):
-    def __init__(self, cfg, margin = 0.3, dist_type='cos', temper = 1.0):
+    def __init__(self, cfg, margin = 0.3, dist_type='cos', temper = 2.0):
         super(DVLoss, self).__init__()
         self.margin = margin
         self.T = temper
