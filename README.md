@@ -43,16 +43,17 @@ Organize them in `your dataset root dir` folder as follows:
 ## Training
 
 ```python
-python -W ignore tools/train.py --config_file='configs/veri.yml'
+sh train.sh
 ```
 
 ## Testing
 
 ```python
-python -W ignore tools/test.py --config_file='configs/veri.yml'
+sh test.sh
 ```
-通过网盘分享的文件：veri_best_model.pth
-链接: https://pan.baidu.com/s/1c7i9brp99YBykdp2ryRVFA?pwd=2e5c 提取码: 2e5c
+## Results
+Download the video of test on the VeRi-776 dataset from [here](https://pan.baidu.com/s/1AubvbI96R4H5Z-azhZKAVg?pwd=v42r).
+Download the trained weights on the VeRi-776 dataset from [here](https://pan.baidu.com/s/1c7i9brp99YBykdp2ryRVFA?pwd=2e5c).
 
 ## Citation
 If you find this code useful for your research, please cite our paper.
