@@ -59,14 +59,14 @@ Download the trained weights on the VeRi-776 dataset from [here](https://pan.bai
 If you find this code useful for your research, please cite our paper.
 
 ```tex
-@article{RSFAN,
-   title={Region-guided Spatial Feature Aggregation Network for Vehicle Re-Identification}, 
-   author={Yanzhen Xiong and Jinjia Peng and Zeze Tao and Huibing Wang},
-   journal={Engineering Applications of Artificial Intelligence}, 
-   year={2024},
-   volume={},
-   number={},
-   pages={},
-   doi={}
-}
+@article{XIONG2025109568,
+title = {Region-guided spatial feature aggregation network for vehicle re-identification},
+journal = {Engineering Applications of Artificial Intelligence},
+volume = {139},
+pages = {109568},
+year = {2025},
+issn = {0952-1976},
+doi = {https://doi.org/10.1016/j.engappai.2024.109568},
+url = {https://www.sciencedirect.com/science/article/pii/S0952197624017263},
+author = {Yanzhen Xiong and Jinjia Peng and Zeze Tao and Huibing Wang}
 ```
